@@ -1,0 +1,6 @@
+*.swp
+.vscode/
+bin/
+Content/bin/
+Content/obj/
+obj/
