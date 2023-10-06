@@ -1,14 +1,11 @@
 ﻿using MGLib;
-using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
-using System;
-using System.Collections.Generic;
 
 new NotatoGame(160, 90, new TitleScene());
 
 internal sealed class TitleScene : Scene {
-	internal Texture2D background;
+	private Texture2D background;
 
 	internal TitleScene() {
 		actions[Keys.Z] = (NotatoGame game) => {
@@ -28,16 +25,10 @@ internal sealed class TitleScene : Scene {
 }
 
 internal sealed class BattleScene : Scene {
-	private struct Tower {
-		internal byte[] name;
-		internal Texture2D texture;
-		internal byte cost;
-	}
-
-	internal Texture2D background;
-	internal Texture2D arrowUpTexture;
-	internal Texture2D arrowDownTexture;
-	internal Texture2D cursorTexture;
+	private Texture2D background;
+	private Texture2D arrowUpTexture;
+	private Texture2D arrowDownTexture;
+	private Texture2D cursorTexture;
 
 	private int timer = 0;
 	private byte cheese = 2;
@@ -50,6 +41,12 @@ internal sealed class BattleScene : Scene {
 		new Tower() { name = new byte[] { 53, 10, 29, 36, 27, 12, 17, 14, 27 }, texture = null, cost = 4 }, // Shoots in a straight line
 		new Tower() { name = new byte[] { 53, 10, 29, 46, 23, 18, 16, 17, 29 }, texture = null, cost = 2 } // Blocks enemies
 	};
+
+	internal BattleScene() {
+		actions[Keys.X] = (NotatoGame game) => {
+			game.changeScene(new TitleScene());
+		};
+	}
 
 	protected override void Initialize(NotatoGame game) {
 		background = game.Content.Load<Texture2D>("frame");
@@ -77,5 +74,11 @@ internal sealed class BattleScene : Scene {
 		game.DrawString(towers[0].name, 27, 81);
 		game.DrawString(new[] { towers[0].cost }, 154, 81);
 		game.Draw(cursorTexture, cursorX, cursorY);
+	}
+
+	private struct Tower {
+		internal byte[] name;
+		internal Texture2D texture;
+		internal byte cost;
 	}
 }
