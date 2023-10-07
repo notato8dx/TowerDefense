@@ -1,6 +1,8 @@
 ﻿using MGLib;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using System;
+using System.Collections.Generic;
 
 new NotatoGame(160, 90, new TitleScene());
 
@@ -37,14 +39,15 @@ internal sealed class BattleScene : Scene {
 	private Texture2D arrowUpTexture;
 	private Texture2D arrowDownTexture;
 	private Texture2D cursorTexture;
+	
+	private State<BattleScene> state = new SelectState();
 
 	private int timer = 0;
 	private byte cheese = 2;
 	private byte cursorX = 4;
 	private byte cursorY = 4;
 	private byte cursorIndex = 0;
-	private bool selecting = false;
-	private byte towerIndex = 0;
+	internal byte towerIndex = 0;
 
 	private Tower[] towers;
 
@@ -52,56 +55,27 @@ internal sealed class BattleScene : Scene {
 
 	internal BattleScene() {
 		actions[Keys.Z] = (NotatoGame game) => {
-			if (selecting) {
-				tiles[cursorIndex] = towerIndex;
-				selecting = false;
-			} else {
-				selecting = true;
-			}
+			state.actions[Keys.Z](this);
 		};
 
 		actions[Keys.X] = (NotatoGame game) => {
-			if (selecting) {
-				selecting = false;
-			}
+			state.actions[Keys.X](this);
 		};
 
 		actions[Keys.Up] = (NotatoGame game) => {
-			if (selecting) {
-				if (towerIndex > 0) {
-					towerIndex--;
-				}
-			} else if (cursorY > CursorOffset) {
-				cursorIndex -= ColumnCount;
-				cursorY -= TileHeight;
-			}
+			state.actions[Keys.Up](this);
 		};
 
 		actions[Keys.Down] = (NotatoGame game) => {
-			if (selecting) {
-				if (towerIndex < TowerCount) {
-					towerIndex++;
-				}
-			} else if (cursorY < TileHeight * (RowCount - 1) + CursorOffset) {
-				cursorIndex += ColumnCount;
-				cursorY += TileHeight;
-			}
+			state.actions[Keys.Down](this);
 		};
 
 		actions[Keys.Left] = (NotatoGame game) => {
-			if (selecting) {
-			} else if (cursorX > CursorOffset) {
-				cursorIndex -= 1;
-				cursorX -= TileWidth;
-			}
+			state.actions[Keys.Left](this);
 		};
 
 		actions[Keys.Right] = (NotatoGame game) => {
-			if (selecting) {
-			} else if (cursorX < TileWidth * (ColumnCount - 1) + CursorOffset) {
-				cursorIndex += 1;
-				cursorX += TileWidth;
-			}
+			state.actions[Keys.Right](this);
 		};
 	}
 
@@ -110,6 +84,7 @@ internal sealed class BattleScene : Scene {
 		arrowUpTexture = game.Content.Load<Texture2D>("arrow_up");
 		arrowDownTexture = game.Content.Load<Texture2D>("arrow_down");
 		cursorTexture = game.Content.Load<Texture2D>("cursor");
+
 		towers = new Tower[TowerCount + 1] {
 			new Tower() { name = new byte[] { }, texture = null, cost = 0 },
 			new Tower() { name = new byte[] { 53, 10, 29, 38, 17, 14, 15 }, texture = game.Content.Load<Texture2D>("rat_chef"), cost = 2 }, // Produces cheese
@@ -134,14 +109,6 @@ internal sealed class BattleScene : Scene {
 		game.Draw(background, 0, 0);
 		game.DrawString(new[] { (byte) (cheese / 10), (byte) (cheese % 10) }, 7, 81);
 		
-		if (towerIndex > 0) {
-			game.Draw(arrowUpTexture, 21, 81);
-		}
-
-		if (towerIndex < TowerCount) {
-			game.Draw(arrowDownTexture, 21, 86);
-		}
-
 		for (byte row = 0; row < RowCount; row++) {
 			for (byte col = 0; col < ColumnCount; col++) {
 				byte tower = tiles[row * ColumnCount + col];
@@ -154,14 +121,117 @@ internal sealed class BattleScene : Scene {
 			}
 		}
 
-		game.DrawString(towers[towerIndex].name, 27, 81);
-		game.DrawString(new[] { towers[towerIndex].cost }, 154, 81);
 		game.Draw(cursorTexture, cursorX, cursorY);
+
+		state.Draw(game, this);
 	}
 
-	private struct Tower {
+	internal struct Tower {
 		internal byte[] name;
 		internal Texture2D texture;
 		internal byte cost;
+
+		internal void Update(BattleScene battleScene) {
+
+		}
 	}
+
+	/*private struct GameTower {
+		private Tower tower;
+		private byte health = 5;
+		private int timer = 0;
+	}*/
+
+	private class SelectState : State<BattleScene> {
+		internal SelectState() {
+			actions[Keys.Z] = (BattleScene scene) => {
+				scene.state = new BuildState();
+			};
+
+			actions[Keys.Up] = (BattleScene scene) => {
+				if (scene.cursorY > CursorOffset) {
+					scene.cursorIndex -= ColumnCount;
+					scene.cursorY -= TileHeight;
+				}
+			};
+
+			actions[Keys.Down] = (BattleScene scene) => {
+				if (scene.cursorY < TileHeight * (RowCount - 1) + CursorOffset) {
+					scene.cursorIndex += ColumnCount;
+					scene.cursorY += TileHeight;
+				}
+			};
+
+			actions[Keys.Left] = (BattleScene scene) => {
+				if (scene.cursorX > CursorOffset) {
+					scene.cursorIndex -= 1;
+					scene.cursorX -= TileWidth;
+				}
+			};
+
+			actions[Keys.Right] = (BattleScene scene) => {
+				if (scene.cursorX < TileWidth * (ColumnCount - 1) + CursorOffset) {
+					scene.cursorIndex += 1;
+					scene.cursorX += TileWidth;
+				}
+			};
+		}
+
+		protected internal override void Draw(NotatoGame game, BattleScene scene) {}
+	}
+
+	private class BuildState : State<BattleScene> {
+		internal BuildState() {
+			actions[Keys.Z] = (BattleScene scene) => {
+				if (scene.cheese >= scene.towers[scene.towerIndex].cost) {
+					scene.cheese -= scene.towers[scene.towerIndex].cost;
+					scene.tiles[scene.cursorIndex] = scene.towerIndex;
+					scene.state = new SelectState();
+				}
+			};
+
+			actions[Keys.X] = (BattleScene scene) => {
+				scene.state = new SelectState();
+			};
+
+			actions[Keys.Up] = (BattleScene scene) => {
+				if (scene.towerIndex > 0) {
+					scene.towerIndex--;
+				}
+			};
+
+			actions[Keys.Down] = (BattleScene scene) => {
+				if (scene.towerIndex < TowerCount) {
+					scene.towerIndex++;
+				}
+			};
+		}
+
+		// Consider putting textures in the state itself
+		protected internal override void Draw(NotatoGame game, BattleScene scene) {
+			if (scene.towerIndex > 0) {
+				game.Draw(scene.arrowUpTexture, 21, 81);
+			}
+
+			if (scene.towerIndex < BattleScene.TowerCount) {
+				game.Draw(scene.arrowDownTexture, 21, 86);
+			}
+
+			game.DrawString(scene.towers[scene.towerIndex].name, 27, 81);
+			game.DrawString(new[] { scene.towers[scene.towerIndex].cost }, 154, 81);
+		}
+	}
+}
+
+internal abstract class State<T> where T : Scene {
+	protected internal readonly Dictionary<Keys, Action<T>> actions = new Dictionary<Keys, Action<T>>() {
+		{ Keys.Z, (T scene) => {} },
+		{ Keys.X, (T scene) => {} },
+		{ Keys.Up, (T scene) => {} },
+		{ Keys.Down, (T scene) => {} },
+		{ Keys.Left, (T scene) => {} },
+		{ Keys.Right, (T scene) => {} }
+	};
+
+	protected internal abstract void Draw(NotatoGame game, T scene);
 }
