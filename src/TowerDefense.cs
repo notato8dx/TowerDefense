@@ -9,17 +9,13 @@ new NotatoGame(160, 90, new TitleScene());
 internal sealed class TitleScene : Scene {
 	private Texture2D background;
 
-	internal TitleScene() {
-		actions[Keys.Z] = (NotatoGame game) => {
-			game.changeScene(new BattleScene());
-		};
-	}
-
 	protected override void Initialize(NotatoGame game) {
 		background = game.Content.Load<Texture2D>("title");
 	}
 
-	protected override void Update(NotatoGame game) {}
+	protected override void OnConfirm(NotatoGame game) {
+		game.changeScene(new BattleScene());
+	}
 
 	protected override void Draw(NotatoGame game) {
 		game.Draw(background, 0, 0);
@@ -53,30 +49,28 @@ internal sealed class BattleScene : Scene {
 
 	private byte[] tiles = new byte[TileCount];
 
-	internal BattleScene() {
-		actions[Keys.Z] = (NotatoGame game) => {
-			state.actions[Keys.Z](this);
-		};
+	protected override void OnConfirm(NotatoGame game) {
+		state.actions[Keys.Z](this);
+	}
 
-		actions[Keys.X] = (NotatoGame game) => {
-			state.actions[Keys.X](this);
-		};
+	protected override void OnCancel(NotatoGame game) {
+		state.actions[Keys.X](this);
+	}
 
-		actions[Keys.Up] = (NotatoGame game) => {
-			state.actions[Keys.Up](this);
-		};
+	protected override void OnMoveUp(NotatoGame game) {
+		state.actions[Keys.Up](this);
+	}
 
-		actions[Keys.Down] = (NotatoGame game) => {
-			state.actions[Keys.Down](this);
-		};
+	protected override void OnMoveDown(NotatoGame game) {
+		state.actions[Keys.Down](this);
+	}
 
-		actions[Keys.Left] = (NotatoGame game) => {
-			state.actions[Keys.Left](this);
-		};
+	protected override void OnMoveLeft(NotatoGame game) {
+		state.actions[Keys.Left](this);
+	}
 
-		actions[Keys.Right] = (NotatoGame game) => {
-			state.actions[Keys.Right](this);
-		};
+	protected override void OnMoveRight(NotatoGame game) {
+		state.actions[Keys.Right](this);
 	}
 
 	protected override void Initialize(NotatoGame game) {
@@ -213,7 +207,7 @@ internal sealed class BattleScene : Scene {
 				game.Draw(scene.arrowUpTexture, 21, 81);
 			}
 
-			if (scene.towerIndex < BattleScene.TowerCount) {
+			if (scene.towerIndex < TowerCount) {
 				game.Draw(scene.arrowDownTexture, 21, 86);
 			}
 
