@@ -14,7 +14,7 @@ internal sealed class TitleScene : Scene {
 	}
 
 	protected override void OnConfirm(NotatoGame game) {
-		game.changeScene(new BattleScene());
+		game.ChangeScene(new BattleScene());
 	}
 
 	protected override void Draw(NotatoGame game) {
