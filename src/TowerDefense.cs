@@ -50,27 +50,27 @@ internal sealed class BattleScene : Scene {
 	private byte[] tiles = new byte[TileCount];
 
 	protected override void OnConfirm(NotatoGame game) {
-		state.actions[Keys.Z](this);
+		state.OnConfirm(this);
 	}
 
 	protected override void OnCancel(NotatoGame game) {
-		state.actions[Keys.X](this);
+		state.OnCancel(this);
 	}
 
 	protected override void OnMoveUp(NotatoGame game) {
-		state.actions[Keys.Up](this);
+		state.OnMoveUp(this);
 	}
 
 	protected override void OnMoveDown(NotatoGame game) {
-		state.actions[Keys.Down](this);
+		state.OnMoveDown(this);
 	}
 
 	protected override void OnMoveLeft(NotatoGame game) {
-		state.actions[Keys.Left](this);
+		state.OnMoveLeft(this);
 	}
 
 	protected override void OnMoveRight(NotatoGame game) {
-		state.actions[Keys.Right](this);
+		state.OnMoveRight(this);
 	}
 
 	protected override void Initialize(NotatoGame game) {
@@ -136,73 +136,67 @@ internal sealed class BattleScene : Scene {
 		private int timer = 0;
 	}*/
 
-	private class SelectState : State<BattleScene> {
-		internal SelectState() {
-			actions[Keys.Z] = (BattleScene scene) => {
-				scene.state = new BuildState();
-			};
-
-			actions[Keys.Up] = (BattleScene scene) => {
-				if (scene.cursorY > CursorOffset) {
-					scene.cursorIndex -= ColumnCount;
-					scene.cursorY -= TileHeight;
-				}
-			};
-
-			actions[Keys.Down] = (BattleScene scene) => {
-				if (scene.cursorY < TileHeight * (RowCount - 1) + CursorOffset) {
-					scene.cursorIndex += ColumnCount;
-					scene.cursorY += TileHeight;
-				}
-			};
-
-			actions[Keys.Left] = (BattleScene scene) => {
-				if (scene.cursorX > CursorOffset) {
-					scene.cursorIndex -= 1;
-					scene.cursorX -= TileWidth;
-				}
-			};
-
-			actions[Keys.Right] = (BattleScene scene) => {
-				if (scene.cursorX < TileWidth * (ColumnCount - 1) + CursorOffset) {
-					scene.cursorIndex += 1;
-					scene.cursorX += TileWidth;
-				}
-			};
+	private sealed class SelectState : State<BattleScene> {
+		public override void OnConfirm(BattleScene scene) {
+			scene.state = new BuildState();
 		}
 
-		protected internal override void Draw(NotatoGame game, BattleScene scene) {}
+		public override void OnMoveUp(BattleScene scene) {
+			if (scene.cursorY > CursorOffset) {
+				scene.cursorIndex -= ColumnCount;
+				scene.cursorY -= TileHeight;
+			}
+		}
+
+		public override void OnMoveDown(BattleScene scene) {
+			if (scene.cursorY < TileHeight * (RowCount - 1) + CursorOffset) {
+				scene.cursorIndex += ColumnCount;
+				scene.cursorY += TileHeight;
+			}
+		}
+
+		public override void OnMoveLeft(BattleScene scene) {
+			if (scene.cursorX > CursorOffset) {
+				scene.cursorIndex -= 1;
+				scene.cursorX -= TileWidth;
+			}
+		}
+
+		public override void OnMoveRight(BattleScene scene) {
+			if (scene.cursorX < TileWidth * (ColumnCount - 1) + CursorOffset) {
+				scene.cursorIndex += 1;
+				scene.cursorX += TileWidth;
+			}
+		}
 	}
 
-	private class BuildState : State<BattleScene> {
-		internal BuildState() {
-			actions[Keys.Z] = (BattleScene scene) => {
-				if (scene.cheese >= scene.towers[scene.towerIndex].cost) {
-					scene.cheese -= scene.towers[scene.towerIndex].cost;
-					scene.tiles[scene.cursorIndex] = scene.towerIndex;
-					scene.state = new SelectState();
-				}
-			};
-
-			actions[Keys.X] = (BattleScene scene) => {
+	private sealed class BuildState : State<BattleScene> {
+		public override void OnConfirm(BattleScene scene) {
+			if (scene.cheese >= scene.towers[scene.towerIndex].cost) {
+				scene.cheese -= scene.towers[scene.towerIndex].cost;
+				scene.tiles[scene.cursorIndex] = scene.towerIndex;
 				scene.state = new SelectState();
-			};
+			}
+		}
 
-			actions[Keys.Up] = (BattleScene scene) => {
-				if (scene.towerIndex > 0) {
-					scene.towerIndex--;
-				}
-			};
+		public override void OnCancel(BattleScene scene) {
+			scene.state = new SelectState();
+		}
 
-			actions[Keys.Down] = (BattleScene scene) => {
-				if (scene.towerIndex < TowerCount) {
-					scene.towerIndex++;
-				}
-			};
+		public override void OnMoveUp(BattleScene scene) {
+			if (scene.towerIndex > 0) {
+				scene.towerIndex--;
+			}
+		}
+
+		public override void OnMoveDown(BattleScene scene) {
+			if (scene.towerIndex < TowerCount) {
+				scene.towerIndex++;
+			}
 		}
 
 		// Consider putting textures in the state itself
-		protected internal override void Draw(NotatoGame game, BattleScene scene) {
+		public override void Draw(NotatoGame game, BattleScene scene) {
 			if (scene.towerIndex > 0) {
 				game.Draw(scene.arrowUpTexture, 21, 81);
 			}
@@ -215,17 +209,4 @@ internal sealed class BattleScene : Scene {
 			game.DrawString(new[] { scene.towers[scene.towerIndex].cost }, 154, 81);
 		}
 	}
-}
-
-internal abstract class State<T> where T : Scene {
-	protected internal readonly Dictionary<Keys, Action<T>> actions = new Dictionary<Keys, Action<T>>() {
-		{ Keys.Z, (T scene) => {} },
-		{ Keys.X, (T scene) => {} },
-		{ Keys.Up, (T scene) => {} },
-		{ Keys.Down, (T scene) => {} },
-		{ Keys.Left, (T scene) => {} },
-		{ Keys.Right, (T scene) => {} }
-	};
-
-	protected internal abstract void Draw(NotatoGame game, T scene);
 }
