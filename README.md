@@ -25,3 +25,8 @@ dotnet publish -c Release -r osx-x64 /p:PublishReadyToRun=false /p:TieredCompila
 ```
 dotnet publish -c Release -r linux-x64 /p:PublishReadyToRun=false /p:TieredCompilation=false --self-contained
 ```
+
+## License
+No license is offered for TowerDefense.
+
+© 2023 Ethan Shaw
