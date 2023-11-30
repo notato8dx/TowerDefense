@@ -3,6 +3,7 @@
 /build:frame.png
 /build:title.png
 /build:cursor.png
-/build:rat_archer.png
-/build:rat_bandit.png
-/build:rat_chef.png
+/build:null.png
+/build:tower_1.png
+/build:tower_2.png
+/build:tower_3.png
