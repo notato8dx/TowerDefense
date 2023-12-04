@@ -1,0 +1,1 @@
+rm -r bin obj Content/bin Content/obj
