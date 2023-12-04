@@ -2,14 +2,25 @@ using MGLib;
 using System;
 
 internal sealed class Battle : Superstate<Battle> {
+	// The number of unique towers in the game
 	private const byte TowerCount = 4;
+
+	// The number of rows on the battlefield
 	private const byte RowCount = 5;
+
+	// The number of columns on the battlefield
 	private const byte ColumnCount = 9;
 
+	// The pixel width of a tile
 	private const byte TileWidth = 17;
+
+	// The pixel height of a tile
 	private const byte TileHeight = 15;
+
+	// The number of pixels from the origin (both x and y) until tiles start
 	private const byte FieldOffset = 4;
 
+	// The data for all towers
 	private readonly Tower[] towers = new Tower[TowerCount + 1] {
 		new Tower(new byte[] {}, "null", 0, (Battle battle) => {}, 0),
 		new Tower(new byte[] { 1 }, "tower_1", 2, (Battle battle) => {
@@ -24,10 +35,12 @@ internal sealed class Battle : Superstate<Battle> {
 		new Tower(new byte[] { 4 }, "tower_2", 2, (Battle battle) => {}, 0)
 	};
 
+	// The data for all projectiles
 	private readonly ProjectileData[] projectiles = new ProjectileData[] {
 		new ProjectileData("tower_1", 1, 2)
 	};
 
+	// The data for all enemies
 	private readonly EnemyData[] enemies = new EnemyData[] {
 		new EnemyData("tower_2", 10, 1),
 		new EnemyData("tower_2", 28, 1),
@@ -35,8 +48,10 @@ internal sealed class Battle : Superstate<Battle> {
 		new EnemyData("tower_2", 65, 1)
 	};
 
+	// The tile data for the current battle
 	private readonly Tile[,] tiles = new Tile[RowCount, ColumnCount];
 
+	// The clock that passively increments money
 	private readonly Clock<Battle> moneyClock = new Clock<Battle>(600, (Battle battle) => {
 		if (battle.money < 99) {
 			battle.money += 1;
@@ -138,6 +153,7 @@ internal sealed class Battle : Superstate<Battle> {
 		substate.Draw(this);
 	}
 
+	// The data for a type of tower
 	internal readonly struct Tower {
 		internal readonly byte[] name;
 		internal readonly Sprite sprite;
@@ -154,6 +170,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// The data for a type of projectile
 	internal readonly struct ProjectileData {
 		internal readonly Sprite sprite;
 		internal readonly byte damage;
@@ -166,6 +183,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// The data for a type of enemy
 	internal readonly struct EnemyData {
 		internal readonly Sprite sprite;
 		internal readonly byte speed;
@@ -178,6 +196,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// The data for a tile in the current battle
 	internal readonly struct Tile {
 		internal readonly byte tower;
 		internal readonly Clock<Battle> clock;
@@ -188,10 +207,12 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// A linked list structure
 	internal class Node<T> where T : Node<T> {
 		internal T next;
 	}
 
+	// A living instance of a projectile
 	internal sealed class Projectile : Node<Projectile> {
 		internal byte id;
 		internal ushort position = FieldOffset;
@@ -201,6 +222,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// A living instance of an enemy
 	internal sealed class Enemy : Node<Enemy> {
 		internal byte id;
 		internal byte health;
@@ -211,6 +233,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// The state when the cursor can move
 	private sealed class SelectState : Substate<Battle> {
 		public override void OnConfirm(Battle superstate) {
 			superstate.ChangeSubstate<BuildState>();
@@ -241,6 +264,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
+	// The state when a tower is being built
 	private sealed class BuildState : Substate<Battle> {
 		private byte towerIndex;
 
