@@ -2,54 +2,43 @@ using MGLib;
 using System;
 
 internal sealed class Battle : Superstate<Battle> {
-	// The number of unique towers in the game
-	private const byte TowerCount = 4;
-
-	// The number of rows on the battlefield
-	private const byte RowCount = 5;
-
-	// The number of columns on the battlefield
-	private const byte ColumnCount = 9;
-
-	// The pixel width of a tile
-	private const byte TileWidth = 17;
-
-	// The pixel height of a tile
-	private const byte TileHeight = 15;
-
-	// The number of pixels from the origin (both x and y) until tiles start
-	private const byte FieldOffset = 4;
+	private const byte TowerDatumCount = 4;
+	private const byte BattlefieldRowCount = 5;
+	private const byte BattlefieldColumnCount = 9;
+	private const byte TilePixelWidth = 17;
+	private const byte TilePixelHeight = 15;
+	private const byte BattlefieldPixelOffset = 4;
 
 	// The data for all towers
-	private readonly Tower[] towers = new Tower[TowerCount + 1] {
-		new Tower(new byte[] {}, "null", 0, (Battle battle) => {}, 0),
-		new Tower(new byte[] { 1 }, "tower_1", 2, (Battle battle) => {
+	private readonly TowerDatum[] towers = new TowerDatum[TowerDatumCount + 1] {
+		new TowerDatum(new byte[] {}, "null", 0, (Battle battle) => {}, 0),
+		new TowerDatum(new byte[] { 1 }, "tower_1", 2, (Battle battle) => {
 			battle.moneyClock.Tick(battle);
 		}, 1),
-		new Tower(new byte[] { 2 }, "tower_2", 5, (Battle battle) => {}, 0),
-		new Tower(new byte[] { 3 }, "tower_3", 4, (Battle battle) => {
+		new TowerDatum(new byte[] { 2 }, "tower_2", 5, (Battle battle) => {}, 0),
+		new TowerDatum(new byte[] { 3 }, "tower_3", 4, (Battle battle) => {
 			Projectile headProjectile = battle.headProjectile;
 			battle.headProjectile = new Projectile(0);
 			battle.headProjectile.next = headProjectile;
 		}, 90),
-		new Tower(new byte[] { 4 }, "tower_2", 2, (Battle battle) => {}, 0)
+		new TowerDatum(new byte[] { 4 }, "tower_2", 2, (Battle battle) => {}, 0)
 	};
 
 	// The data for all projectiles
-	private readonly ProjectileData[] projectiles = new ProjectileData[] {
-		new ProjectileData("tower_1", 1, 2)
+	private readonly ProjectileDatum[] projectiles = new ProjectileDatum[] {
+		new ProjectileDatum("tower_1", 1, 2)
 	};
 
 	// The data for all enemies
-	private readonly EnemyData[] enemies = new EnemyData[] {
-		new EnemyData("tower_2", 10, 1),
-		new EnemyData("tower_2", 28, 1),
-		new EnemyData("tower_2", 17, 2),
-		new EnemyData("tower_2", 65, 1)
+	private readonly EnemyDatum[] enemies = new EnemyDatum[] {
+		new EnemyDatum("tower_2", 10, 1),
+		new EnemyDatum("tower_2", 28, 1),
+		new EnemyDatum("tower_2", 17, 2),
+		new EnemyDatum("tower_2", 65, 1)
 	};
 
 	// The tile data for the current battle
-	private readonly Tile[,] tiles = new Tile[RowCount, ColumnCount];
+	private readonly Tile[,] tiles = new Tile[BattlefieldRowCount, BattlefieldColumnCount];
 
 	// The clock that passively increments money
 	private readonly Clock<Battle> moneyClock = new Clock<Battle>(600, (Battle battle) => {
@@ -73,8 +62,8 @@ internal sealed class Battle : Superstate<Battle> {
 	public Battle() {
 		ChangeSubstate<SelectState>();
 
-		for (byte row = 0; row < RowCount; row += 1) {
-			for (byte col = 0; col < ColumnCount; col += 1) {
+		for (byte row = 0; row < BattlefieldRowCount; row += 1) {
+			for (byte col = 0; col < BattlefieldColumnCount; col += 1) {
 				tiles[row, col] = new Tile(this, 0);
 			}
 		}
@@ -96,7 +85,7 @@ internal sealed class Battle : Superstate<Battle> {
 		while (currentProjectile != null) {
 			currentProjectile.position += projectiles[currentProjectile.id].speed;
 
-			if (currentProjectile.position >= TileWidth * ColumnCount + FieldOffset) {
+			if (currentProjectile.position >= TilePixelWidth * BattlefieldColumnCount + BattlefieldPixelOffset) {
 				if (previousProjectile != null) {
 					previousProjectile.next = currentProjectile.next;
 				} else {
@@ -130,9 +119,9 @@ internal sealed class Battle : Superstate<Battle> {
 		Game.Draw(background, 0, 0);
 		Game.DrawString(new[] { (byte) (money / 10), (byte) (money % 10) }, 7, 81);
 		
-		for (byte row = 0; row < RowCount; row += 1) {
-			for (byte col = 0; col < ColumnCount; col += 1) {
-				Game.Draw(towers[tiles[row, col].tower].sprite, FieldOffset + col * TileWidth, FieldOffset + row * TileHeight);
+		for (byte row = 0; row < BattlefieldRowCount; row += 1) {
+			for (byte col = 0; col < BattlefieldColumnCount; col += 1) {
+				Game.Draw(towers[tiles[row, col].tower].sprite, BattlefieldPixelOffset + col * TilePixelWidth, BattlefieldPixelOffset + row * TilePixelHeight);
 			}
 		}
 
@@ -148,20 +137,19 @@ internal sealed class Battle : Superstate<Battle> {
 			currentEnemy = currentEnemy.next;
 		}
 
-		Game.Draw(cursorTexture, FieldOffset + cursorColumn * TileWidth, FieldOffset + cursorRow * TileHeight);
+		Game.Draw(cursorTexture, BattlefieldPixelOffset + cursorColumn * TilePixelWidth, BattlefieldPixelOffset + cursorRow * TilePixelHeight);
 
 		substate.Draw(this);
 	}
 
-	// The data for a type of tower
-	internal readonly struct Tower {
+	internal readonly struct TowerDatum {
 		internal readonly byte[] name;
 		internal readonly Sprite sprite;
 		internal readonly byte cost;
 		internal readonly ushort period;
 		internal readonly Action<Battle> update;
 
-		internal Tower(byte[] name, string sprite, byte cost, Action<Battle> update, ushort period) {
+		internal TowerDatum(byte[] name, string sprite, byte cost, Action<Battle> update, ushort period) {
 			this.name = name;
 			this.sprite = new Sprite(sprite);
 			this.cost = cost;
@@ -170,26 +158,24 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 	}
 
-	// The data for a type of projectile
-	internal readonly struct ProjectileData {
+	internal readonly struct ProjectileDatum {
 		internal readonly Sprite sprite;
 		internal readonly byte damage;
 		internal readonly byte speed;
 
-		internal ProjectileData(string sprite, byte damage, byte speed) {
+		internal ProjectileDatum(string sprite, byte damage, byte speed) {
 			this.sprite = new Sprite(sprite);
 			this.damage = damage;
 			this.speed = speed;
 		}
 	}
 
-	// The data for a type of enemy
-	internal readonly struct EnemyData {
+	internal readonly struct EnemyDatum {
 		internal readonly Sprite sprite;
 		internal readonly byte speed;
 		internal readonly byte health;
 
-		internal EnemyData(string sprite, byte health, byte speed) {
+		internal EnemyDatum(string sprite, byte health, byte speed) {
 			this.sprite = new Sprite(sprite);
 			this.health = health;
 			this.speed = speed;
@@ -215,7 +201,7 @@ internal sealed class Battle : Superstate<Battle> {
 	// A living instance of a projectile
 	internal sealed class Projectile : Node<Projectile> {
 		internal byte id;
-		internal ushort position = FieldOffset;
+		internal ushort position = BattlefieldPixelOffset;
 
 		internal Projectile(byte id) {
 			this.id = id;
@@ -246,7 +232,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 
 		public override void OnMoveDown(Battle superstate) {
-			if (superstate.cursorRow < RowCount - 1) {
+			if (superstate.cursorRow < BattlefieldRowCount - 1) {
 				superstate.cursorRow += 1;
 			}
 		}
@@ -258,7 +244,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 
 		public override void OnMoveRight(Battle superstate) {
-			if (superstate.cursorColumn < ColumnCount - 1) {
+			if (superstate.cursorColumn < BattlefieldColumnCount - 1) {
 				superstate.cursorColumn += 1;
 			}
 		}
@@ -287,7 +273,7 @@ internal sealed class Battle : Superstate<Battle> {
 		}
 
 		public override void OnMoveDown(Battle superstate) {
-			if (towerIndex < TowerCount) {
+			if (towerIndex < TowerDatumCount) {
 				towerIndex += 1;
 			}
 		}
@@ -297,7 +283,7 @@ internal sealed class Battle : Superstate<Battle> {
 				Game.Draw(superstate.arrowUpTexture, 21, 81);
 			}
 
-			if (towerIndex < TowerCount) {
+			if (towerIndex < TowerDatumCount) {
 				Game.Draw(superstate.arrowDownTexture, 21, 86);
 			}
 
