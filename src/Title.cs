@@ -3,7 +3,7 @@ using MGLib;
 Game.Start<Title>(160, 90);
 
 internal sealed class Title : State {
-	private readonly Sprite background = new Sprite("title");
+	private readonly Sprite background = new("title");
 
 	protected override void OnConfirm() {
 		Game.ChangeState<Battle>();

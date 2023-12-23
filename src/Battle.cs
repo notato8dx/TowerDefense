@@ -1,291 +1,258 @@
 using MGLib;
 using System;
+using System.Collections.Generic;
 
 internal sealed class Battle : Superstate<Battle> {
-	private const byte TowerDatumCount = 4;
-	private const byte BattlefieldRowCount = 5;
-	private const byte BattlefieldColumnCount = 9;
 	private const byte TilePixelWidth = 17;
 	private const byte TilePixelHeight = 15;
 	private const byte BattlefieldPixelOffset = 4;
 
-	// For the size, TowerDatumCount + 1 is used to accomodate the datum used by empty tileData.
-	private readonly TowerDatum[] towerData = new TowerDatum[TowerDatumCount + 1] {
-		new TowerDatum(new byte[] {}, "null", 0, (Battle battle) => {}, 0),
-		new TowerDatum(new byte[] { 1 }, "tower_1", 2, (Battle battle) => {
-			battle.moneyClock.Tick(battle);
-		}, 1),
-		new TowerDatum(new byte[] { 2 }, "tower_2", 5, (Battle battle) => {}, 0),
-		new TowerDatum(new byte[] { 3 }, "tower_3", 4, (Battle battle) => {
-			Projectile headProjectile = battle.headProjectile;
-			battle.headProjectile = new Projectile(0);
-			battle.headProjectile.next = headProjectile;
-		}, 90),
-		new TowerDatum(new byte[] { 4 }, "tower_2", 2, (Battle battle) => {}, 0)
-	};
+	private readonly TowerDatum[] TowerData = [
+		new([], "null", 0, (TowerClockData data) => {}, 0),
+		new([ 1 ], "tower_1", 2, (TowerClockData data) => data.battle.MoneyClock.Tick(data.battle), 1),
+		new([ 2 ], "tower_2", 5, (TowerClockData data) => {}, 0),
+		new([ 3 ], "tower_3", 4, (TowerClockData data) => data.battle.Projectiles[data.row].Add(new(0, data.column)), 90),
+		new([ 4 ], "tower_2", 2, (TowerClockData data) => {}, 0)
+	];
 
-	private readonly ProjectileDatum[] projectileData = new ProjectileDatum[] {
-		new ProjectileDatum("tower_1", 1, 2)
-	};
+	private readonly ProjectileDatum[] ProjectileData = [
+		new("tower_1", 1, 2)
+	];
 
-	private readonly EnemyDatum[] enemyData = new EnemyDatum[] {
-		new EnemyDatum("tower_2", 10, 1),
-		new EnemyDatum("tower_2", 28, 1),
-		new EnemyDatum("tower_2", 17, 2),
-		new EnemyDatum("tower_2", 65, 1)
-	};
+	private readonly EnemyDatum[] EnemyData = [
+		new("tower_2", 10, 1),
+		new("tower_2", 28, 1),
+		new("tower_2", 17, 2),
+		new("tower_2", 65, 1)
+	];
 
-	private readonly Tile[,] tileData = new Tile[BattlefieldRowCount, BattlefieldColumnCount];
+	private readonly Clock<Battle> MoneyClock = new(600, (Battle battle) => Clamper.IncrementToMax(ref battle.Money, 300));
+	private readonly Tower[,] Towers = new Tower[5, 9];
+	private readonly HashSet<Projectile>[] Projectiles;
+	private readonly HashSet<Enemy>[] Enemies;
+	private readonly Sprite Background = new("frame");
+	private readonly Sprite ArrowUpTexture = new("arrow_up");
+	private readonly Sprite ArrowDownTexture = new("arrow_down");
+	private readonly Sprite CursorTexture = new("cursor");
 
-	// The clock that passively increments money
-	private readonly Clock<Battle> moneyClock = new Clock<Battle>(600, (Battle battle) => {
-		if (battle.money < 99) {
-			battle.money += 1;
-		}
-	});
+	private byte Money = 20;
+	private byte CursorRow;
+	private byte CursorColumn;
 
-	private readonly Sprite background = new Sprite("frame");
-	private readonly Sprite arrowUpTexture = new Sprite("arrow_up");
-	private readonly Sprite arrowDownTexture = new Sprite("arrow_down");
-	private readonly Sprite cursorTexture = new Sprite("cursor");
-
-	private Projectile headProjectile;
-	private Enemy headEnemy;
-
-	private byte money = 20;
-	private byte cursorRow;
-	private byte cursorColumn;
-
-	public Battle() {
-		ChangeSubstate<SelectState>();
-
-		for (byte row = 0; row < BattlefieldRowCount; row += 1) {
-			for (byte col = 0; col < BattlefieldColumnCount; col += 1) {
-				tileData[row, col] = new Tile(this, 0);
+	public Battle() : base(new SelectState()) {
+		for (var row = 0; row < Towers.GetLength(0); row += 1) {
+			for (var col = 0; col < Towers.GetLength(1); col += 1) {
+				Towers[row, col] = new(0, TowerData);
 			}
+		};
+
+		Projectiles = new HashSet<Projectile>[Towers.GetLength(0)];
+		for (var i = 0; i < Towers.GetLength(0); i += 1) {
+			Projectiles[i] = [];
 		}
 
-		Enemy headEnemy = this.headEnemy;
-		this.headEnemy = new Enemy(0);
-		this.headEnemy.next = headEnemy;
+		Enemies = new HashSet<Enemy>[Towers.GetLength(0)];
+		for (var i = 0; i < Towers.GetLength(0); i += 1) {
+			Enemies[i] = [];
+		}
 	}
 
 	protected override void Update() {
-		moneyClock.Tick(this);
+		MoneyClock.Tick(this);
 
-		foreach (Tile tile in tileData) {
-			tile.clock.Tick(this);
-		}
+		for (var row = 0; row < Towers.GetLength(0); row += 1) {
+			for (var col = 0; col < Towers.GetLength(1); col += 1) {
+				Towers[row, col].clock.Tick(new(this, row, col));
+			}
+		};
 
-		Projectile previousProjectile = null;
-		Projectile currentProjectile = headProjectile;
-		while (currentProjectile != null) {
-			currentProjectile.position += projectileData[currentProjectile.id].speed;
+		foreach (var row in Projectiles) {
+			foreach (var projectile in row) {
+				projectile.position += ProjectileData[projectile.datumId].speed;
 
-			if (currentProjectile.position >= TilePixelWidth * BattlefieldColumnCount + BattlefieldPixelOffset) {
-				if (previousProjectile != null) {
-					previousProjectile.next = currentProjectile.next;
-				} else {
-					headProjectile = currentProjectile.next;
+				if (projectile.position >= TilePixelWidth * Towers.GetLength(1) + BattlefieldPixelOffset) {
+					row.Remove(projectile);
 				}
 			}
-
-			previousProjectile = currentProjectile;
-			currentProjectile = currentProjectile.next;
 		}
 
-		Enemy previousEnemy = null;
-		Enemy currentEnemy = headEnemy;
-		while (currentEnemy != null) {
-			currentEnemy.position -= enemyData[currentEnemy.id].speed;
+		foreach (var row in Enemies) {
+			foreach (var enemy in row) {
+				enemy.position -= EnemyData[enemy.datumId].speed;
 
-			if (currentEnemy.position <= 0) {
-				if (previousEnemy != null) {
-					previousEnemy.next = currentEnemy.next;
-				} else {
-					headEnemy = currentEnemy.next;
+				if (enemy.position <= 0) {
+					row.Remove(enemy);
 				}
 			}
-
-			previousEnemy = currentEnemy;
-			currentEnemy = currentEnemy.next;
 		}
 	}
 
 	protected override void Draw() {
-		Game.Draw(background, 0, 0);
-		Game.DrawString(new[] { (byte) (money / 10), (byte) (money % 10) }, 7, 81);
-		
-		for (byte row = 0; row < BattlefieldRowCount; row += 1) {
-			for (byte col = 0; col < BattlefieldColumnCount; col += 1) {
-				Game.Draw(towerData[tileData[row, col].tower].sprite, BattlefieldPixelOffset + col * TilePixelWidth, BattlefieldPixelOffset + row * TilePixelHeight);
+		Game.Draw(Background);
+		Game.DrawString([ (byte) (Money / 10), (byte) (Money % 10) ], 7, 81);
+
+		for (var row = 0; row < Towers.GetLength(0); row += 1) {
+			for (var col = 0; col < Towers.GetLength(1); col += 1) {
+				Game.Draw(TowerData[Towers[row, col].datumId].sprite, BattlefieldPixelOffset + col * TilePixelWidth, BattlefieldPixelOffset + row * TilePixelHeight);
 			}
 		}
 
-		Projectile currentProjectile = headProjectile;
-		while (currentProjectile != null) {
-			Game.Draw(projectileData[currentProjectile.id].sprite, currentProjectile.position, 5);
-			currentProjectile = currentProjectile.next;
+		for (var row = 0; row < Enemies.Length; row += 1) {
+			foreach (var enemy in Enemies[row]) {
+				Game.Draw(EnemyData[enemy.datumId].sprite, enemy.position, BattlefieldPixelOffset + row * TilePixelHeight);
+			}
 		}
 
-		Enemy currentEnemy = headEnemy;
-		while (currentEnemy != null) {
-			Game.Draw(enemyData[currentEnemy.id].sprite, currentEnemy.position, 50);
-			currentEnemy = currentEnemy.next;
+		for (var row = 0; row < Projectiles.Length; row += 1) {
+			foreach (var projectile in Projectiles[row]) {
+				Game.Draw(ProjectileData[projectile.datumId].sprite, projectile.position, BattlefieldPixelOffset + row * TilePixelHeight);
+			}
 		}
 
-		Game.Draw(cursorTexture, BattlefieldPixelOffset + cursorColumn * TilePixelWidth, BattlefieldPixelOffset + cursorRow * TilePixelHeight);
+		Game.Draw(CursorTexture, BattlefieldPixelOffset + CursorColumn * TilePixelWidth, BattlefieldPixelOffset + CursorRow * TilePixelHeight);
 
-		substate.Draw(this);
+		base.Draw();
 	}
 
-	internal readonly struct TowerDatum {
+	private readonly struct TowerClockData {
+		internal readonly Battle battle;
+		internal readonly int row;
+		internal readonly int column;
+
+		internal TowerClockData(Battle battle, int row, int column) {
+			this.battle = battle;
+			this.row = row;
+			this.column = column;
+		}
+	}
+
+	private readonly struct TowerDatum {
 		internal readonly byte[] name;
 		internal readonly Sprite sprite;
 		internal readonly byte cost;
 		internal readonly ushort period;
-		internal readonly Action<Battle> update;
+		internal readonly Action<TowerClockData> update;
 
-		internal TowerDatum(byte[] name, string sprite, byte cost, Action<Battle> update, ushort period) {
+		internal TowerDatum(byte[] name, string sprite, byte cost, Action<TowerClockData> update, ushort period) {
 			this.name = name;
-			this.sprite = new Sprite(sprite);
+			this.sprite = new(sprite);
 			this.cost = cost;
 			this.update = update;
 			this.period = period;
 		}
 	}
 
-	internal readonly struct ProjectileDatum {
+	private readonly struct ProjectileDatum {
 		internal readonly Sprite sprite;
 		internal readonly byte damage;
 		internal readonly byte speed;
 
 		internal ProjectileDatum(string sprite, byte damage, byte speed) {
-			this.sprite = new Sprite(sprite);
+			this.sprite = new(sprite);
 			this.damage = damage;
 			this.speed = speed;
 		}
 	}
 
-	internal readonly struct EnemyDatum {
+	private readonly struct EnemyDatum {
 		internal readonly Sprite sprite;
-		internal readonly byte speed;
 		internal readonly byte health;
+		internal readonly byte speed;
 
 		internal EnemyDatum(string sprite, byte health, byte speed) {
-			this.sprite = new Sprite(sprite);
+			this.sprite = new(sprite);
 			this.health = health;
 			this.speed = speed;
 		}
 	}
 
-	// The data for a tile in the current battle
-	internal readonly struct Tile {
-		internal readonly byte tower;
-		internal readonly Clock<Battle> clock;
+	private readonly struct Tower {
+		internal readonly int datumId;
+		internal readonly Clock<TowerClockData> clock;
 
-		internal Tile(Battle battle, byte tower) {
-			this.tower = tower;
-			clock = new Clock<Battle>(battle.towerData[tower].period, battle.towerData[tower].update);
+		internal Tower(int datumId, TowerDatum[] data) {
+			this.datumId = datumId;
+			clock = new(data[datumId].period, data[datumId].update);
 		}
 	}
 
-	// A linked list structure
-	internal class Node<T> where T : Node<T> {
-		internal T next;
-	}
+	private sealed class Projectile {
+		internal readonly int datumId;
+		internal int position;
 
-	// A living instance of a projectile
-	internal sealed class Projectile : Node<Projectile> {
-		internal byte id;
-		internal ushort position = BattlefieldPixelOffset;
-
-		internal Projectile(byte id) {
-			this.id = id;
+		internal Projectile(int datumId, int column) {
+			this.datumId = datumId;
+			position = BattlefieldPixelOffset + column * TilePixelWidth;
 		}
 	}
 
-	// A living instance of an enemy
-	internal sealed class Enemy : Node<Enemy> {
-		internal byte id;
+	private sealed class Enemy {
+		internal readonly int datumId;
 		internal byte health;
 		internal ushort position = 160;
 
-		internal Enemy(byte id) {
-			this.id = id;
+		internal Enemy(int datumId, EnemyDatum[] data) {
+			this.datumId = datumId;
+			health = data[datumId].health;
 		}
 	}
 
-	// The state when the cursor can move
 	private sealed class SelectState : Substate<Battle> {
-		public override void OnConfirm(Battle superstate) {
-			superstate.ChangeSubstate<BuildState>();
+		public override void OnConfirm(Battle battle) {
+			battle.ChangeSubstate<BuildState>();
 		}
 
-		public override void OnMoveUp(Battle superstate) {
-			if (superstate.cursorRow > 0) {
-				superstate.cursorRow -= 1;
-			}
+		public override void OnMoveUp(Battle battle) {
+			Clamper.DecrementToMin(ref battle.CursorRow, 0);
 		}
 
-		public override void OnMoveDown(Battle superstate) {
-			if (superstate.cursorRow < BattlefieldRowCount - 1) {
-				superstate.cursorRow += 1;
-			}
+		public override void OnMoveDown(Battle battle) {
+			Clamper.IncrementToMax(ref battle.CursorRow, battle.Towers.GetLength(0));
 		}
 
-		public override void OnMoveLeft(Battle superstate) {
-			if (superstate.cursorColumn > 0) {
-				superstate.cursorColumn -= 1;
-			}
+		public override void OnMoveLeft(Battle battle) {
+			Clamper.DecrementToMin(ref battle.CursorColumn, 0);
 		}
 
-		public override void OnMoveRight(Battle superstate) {
-			if (superstate.cursorColumn < BattlefieldColumnCount - 1) {
-				superstate.cursorColumn += 1;
-			}
+		public override void OnMoveRight(Battle battle) {
+			Clamper.IncrementToMax(ref battle.CursorColumn, battle.Towers.GetLength(1));
 		}
 	}
 
-	// The state when a tower is being built
 	private sealed class BuildState : Substate<Battle> {
-		private byte towerIndex;
+		private int TowerIndex;
 
-		public override void OnConfirm(Battle superstate) {
-			if (superstate.money >= superstate.towerData[towerIndex].cost) {
-				superstate.money -= superstate.towerData[towerIndex].cost;
-				superstate.tileData[superstate.cursorRow, superstate.cursorColumn] = new Tile(superstate, towerIndex);
-				superstate.ChangeSubstate<SelectState>();
+		public override void OnConfirm(Battle battle) {
+			if (battle.Money >= battle.TowerData[TowerIndex].cost) {
+				battle.Money -= battle.TowerData[TowerIndex].cost;
+				battle.Towers[battle.CursorRow, battle.CursorColumn] = new(TowerIndex, battle.TowerData);
+				battle.ChangeSubstate<SelectState>();
 			}
 		}
 
-		public override void OnCancel(Battle superstate) {
-			superstate.ChangeSubstate<SelectState>();
+		public override void OnCancel(Battle battle) {
+			battle.ChangeSubstate<SelectState>();
 		}
 
-		public override void OnMoveUp(Battle superstate) {
-			if (towerIndex > 0) {
-				towerIndex -= 1;
-			}
+		public override void OnMoveUp(Battle battle) {
+			Clamper.DecrementToMin(ref TowerIndex, 0);
 		}
 
-		public override void OnMoveDown(Battle superstate) {
-			if (towerIndex < TowerDatumCount) {
-				towerIndex += 1;
-			}
+		public override void OnMoveDown(Battle battle) {
+			Clamper.IncrementToMax(ref TowerIndex, battle.TowerData.Length);
 		}
 
-		public override void Draw(Battle superstate) {
-			if (towerIndex > 0) {
-				Game.Draw(superstate.arrowUpTexture, 21, 81);
+		public override void Draw(Battle battle) {
+			if (TowerIndex > 0) {
+				Game.Draw(battle.ArrowUpTexture, 21, 81);
 			}
 
-			if (towerIndex < TowerDatumCount) {
-				Game.Draw(superstate.arrowDownTexture, 21, 86);
+			if (TowerIndex < battle.TowerData.Length - 1) {
+				Game.Draw(battle.ArrowDownTexture, 21, 86);
 			}
 
-			Game.DrawString(superstate.towerData[towerIndex].name, 27, 81);
-			Game.DrawString(new[] { superstate.towerData[towerIndex].cost }, 154, 81);
+			Game.DrawString(battle.TowerData[TowerIndex].name, 27, 81);
+			Game.DrawString([ battle.TowerData[TowerIndex].cost ], 154, 81);
 		}
 	}
 }
