@@ -1,0 +1,8 @@
+csharp_new_line_before_open_brace = all
+csharp_style_var_for_built_in_types = true
+dotnet_analyzer_diagnostic.severity = error
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
+dotnet_diagnostic.CA1814.severity = default
+dotnet_diagnostic.CA1815.severity = default
+csharp_new_line_before_open_brace = none
+indent_style = tab
