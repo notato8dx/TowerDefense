@@ -7,5 +7,7 @@
 /build:tower_1.png
 /build:tower_2.png
 /build:tower_3.png
-/build:title-screen.mp3
 /build:title-animated.png
+
+/processor:SongProcessor
+/build:title-screen.wav
